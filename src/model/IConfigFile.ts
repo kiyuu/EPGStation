@@ -135,6 +135,7 @@ export default interface IConfigFile {
     // エンコード設定
     encodeProcessNum: number; // エンコード、ストリーミング最大プロセス数
     concurrentEncodeNum: number; // 同時エンコード数
+    encodeModeGroups?: string[][]; // モードグループ定義（設定時はグループ数が同時エンコード数になる）
     encode: {
         name: string;
         cmd: string;

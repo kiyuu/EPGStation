@@ -18,6 +18,7 @@ class EncodeManageModel implements IEncodeManageModel {
     private encoderModelProvider: EncoderModelProvider;
     private encodeEvent: IEncodeEvent;
     private concurrentEncodeNum: number;
+    private encodeModeGroups: string[][] | null;
     private waitQueue: IEncoderModel[] = [];
     private runningQueue: IEncoderModel[] = [];
     private idCnt: number = 1;
@@ -33,7 +34,11 @@ class EncodeManageModel implements IEncodeManageModel {
     ) {
         this.log = logger.getLogger();
         this.executeManagementModel = executeManagementModel;
-        this.concurrentEncodeNum = configure.getConfig().concurrentEncodeNum;
+        const config = configure.getConfig();
+        this.encodeModeGroups = config.encodeModeGroups ?? null;
+        this.concurrentEncodeNum = this.encodeModeGroups !== null
+            ? this.encodeModeGroups.length + 1 // 定義グループ数 + その他グループ
+            : config.concurrentEncodeNum;
         this.encoderModelProvider = encoderModelProvider;
         this.encodeEvent = encodeEvent;
 
@@ -105,62 +110,116 @@ class EncodeManageModel implements IEncodeManageModel {
      * @return Promise<void>
      */
     private async checkQueue(): Promise<void> {
-        // 実行権取得
         const exeId = await this.executeManagementModel.getExecution(
             EncodeManageModel.CREATE_ENCODING_PROCESS_PRIPORITY,
         );
 
-        // runningQueue がロック中 or 同時エンコード最大数に達している or waitQueue が空の場合はスルー
-        if (this.runningQueue.length >= this.concurrentEncodeNum || this.waitQueue.length === 0) {
-            // 実行権開放
-            this.executeManagementModel.unLockExecution(exeId);
+        if (this.encodeModeGroups !== null) {
+            await this.checkQueueWithGroups();
+        } else {
+            await this.checkQueueDefault();
+        }
 
+        this.executeManagementModel.unLockExecution(exeId);
+    }
+
+    private getGroupId(mode: string): number {
+        if (this.encodeModeGroups === null) {
+            return -1;
+        }
+        for (let i = 0; i < this.encodeModeGroups.length; i++) {
+            for (const pattern of this.encodeModeGroups[i]) {
+                if (pattern.endsWith('*')) {
+                    if (mode.startsWith(pattern.slice(0, -1))) {
+                        return i;
+                    }
+                } else if (mode === pattern) {
+                    return i;
+                }
+            }
+        }
+        return this.encodeModeGroups.length; // その他グループ
+    }
+
+    private async checkQueueWithGroups(): Promise<void> {
+        while (this.runningQueue.length < this.concurrentEncodeNum && this.waitQueue.length > 0) {
+            const runningGroupIds = new Set(
+                this.runningQueue
+                    .map(e => {
+                        const opt = e.getEncodeOption();
+                        return opt !== null ? this.getGroupId(opt.mode) : -1;
+                    })
+                    .filter(id => id !== -1),
+            );
+
+            const idx = this.waitQueue.findIndex(e => {
+                const opt = e.getEncodeOption();
+                return opt !== null && !runningGroupIds.has(this.getGroupId(opt.mode));
+            });
+
+            if (idx === -1) {
+                break;
+            }
+
+            const [encoder] = this.waitQueue.splice(idx, 1);
+            if (typeof encoder === 'undefined') {
+                break;
+            }
+
+            const encodeOption = encoder.getEncodeOption();
+            if (encodeOption === null) {
+                this.log.encode.warn('encodeOption is null');
+                continue;
+            }
+
+            this.runningQueue.push(encoder);
+
+            encoder.setOnFinish((isError, outputFilePath) => {
+                this.onFinish(isError, outputFilePath, encodeOption);
+            });
+
+            try {
+                await encoder.start();
+            } catch (err: any) {
+                this.log.encode.error(`create encode process error: ${encoder.getEncodeId()}`);
+                this.log.encode.error(err);
+                this.encodeEvent.emitErrorEncode();
+                this.finalize(encodeOption.encodeId);
+            }
+        }
+    }
+
+    private async checkQueueDefault(): Promise<void> {
+        if (this.runningQueue.length >= this.concurrentEncodeNum || this.waitQueue.length === 0) {
             return;
         }
 
-        // waitQueue から取り出す
         const encoder = this.waitQueue.shift();
         if (typeof encoder === 'undefined') {
-            // 実行権開放
-            this.executeManagementModel.unLockExecution(exeId);
-
             return;
         }
 
-        // encodeOption が無い場合は何もしない
         const encodeOption = encoder.getEncodeOption();
         if (encodeOption === null) {
-            // 実行権開放
-            this.executeManagementModel.unLockExecution(exeId);
-            this.log.encode.warn('encodeOption is null'); // encoder 生成時にセットされているはずなので警告を出す
-
+            this.log.encode.warn('encodeOption is null');
             return;
         }
 
-        // runningQueue に積む
         this.runningQueue.push(encoder);
 
-        // エンコード終了時の処理をセット
         encoder.setOnFinish((isError, outputFilePath) => {
             this.onFinish(isError, outputFilePath, encodeOption);
         });
 
-        // エンコードプロセス開始
         let needsFinalize = false;
         try {
             await encoder.start();
         } catch (err: any) {
             this.log.encode.error(`create encode process error: ${encoder.getEncodeId()}`);
             this.log.encode.error(err);
-
             needsFinalize = true;
-
-            // エラー通知
             this.encodeEvent.emitErrorEncode();
         }
-
-        // 実行権開放
-        this.executeManagementModel.unLockExecution(exeId);
 
         if (needsFinalize === true) {
             this.finalize(encodeOption.encodeId);
