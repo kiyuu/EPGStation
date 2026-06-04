@@ -11,7 +11,7 @@
                     <div class="text caption font-regular">{{ item.display.encodeInfo }}</div>
                     <v-progress-linear v-if="typeof item.display.percent !== 'undefined'" buffer-value="100" :value="item.display.percent"></v-progress-linear>
                 </div>
-                <div v-if="isEditMode === false" class="right-buttons d-flex flex-column justify-center">
+                <div v-if="isEditMode === false" class="right-buttons d-flex flex-column justify-start">
                     <v-btn icon v-on:click.stop="openCancelDialog">
                         <v-icon>mdi-close</v-icon>
                     </v-btn>
