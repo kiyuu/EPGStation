@@ -14,6 +14,7 @@ export default class EncodeState implements IEncodeState {
     private channelModel: IChannelModel;
 
     private encodeInfo: EncodeInfoDisplayData | null = null;
+    private lastIsHalfWidth: boolean = true;
 
     constructor(@inject('IEncodeApiModel') encodeApiModel: IEncodeApiModel, @inject('IChannelModel') channelModel: IChannelModel) {
         this.encodeApiModel = encodeApiModel;
@@ -33,6 +34,7 @@ export default class EncodeState implements IEncodeState {
      * @return Promise<void>
      */
     public async fetchData(isHalfWidth: boolean): Promise<void> {
+        this.lastIsHalfWidth = isHalfWidth;
         const info = await this.encodeApiModel.gets(isHalfWidth);
 
         const oldSelectedIndex: SelectedIndex = {};
@@ -243,5 +245,10 @@ export default class EncodeState implements IEncodeState {
         if (hasError === true) {
             throw new Error();
         }
+    }
+
+    public async moveWaitItem(encodeId: apid.EncodeId, direction: 'up' | 'down'): Promise<void> {
+        await this.encodeApiModel.move(encodeId, direction);
+        await this.fetchData(this.lastIsHalfWidth);
     }
 }

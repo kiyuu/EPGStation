@@ -494,6 +494,20 @@ class EncodeManageModel implements IEncodeManageModel {
 
         return queueInfo;
     }
+
+    public moveWaitQueue(encodeId: apid.EncodeId, direction: 'up' | 'down'): void {
+        const idx = this.waitQueue.findIndex(q => q.getEncodeId() === encodeId);
+        if (idx === -1) {
+            throw new Error('EncodeIdNotFound');
+        }
+        const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+        if (swapIdx < 0 || swapIdx >= this.waitQueue.length) {
+            return;
+        }
+        const tmp = this.waitQueue[idx];
+        this.waitQueue[idx] = this.waitQueue[swapIdx];
+        this.waitQueue[swapIdx] = tmp;
+    }
 }
 
 namespace EncodeManageModel {
