@@ -4,19 +4,25 @@
             <div class="d-flex my-1 recorded-small-card" v-on:click="clickItem">
                 <v-img aspect-ratio="1.7778" :src="item.display.topThumbnailPath" v-on:error="this.src = './img/noimg.png'" eager class="thumbnail"></v-img>
                 <div class="content pa-2 my-auto">
-                    <div class="d-flex align-center">
-                        <div class="text mt-1 subtitle-2 font-weight-bold">{{ item.display.name }}</div>
-                        <div v-if="isEditMode === false" class="menu-wrap">
-                            <v-btn icon class="menu-button" v-on:click="openCancelDialog">
-                                <v-icon>mdi-close</v-icon>
-                            </v-btn>
-                        </div>
-                    </div>
+                    <div class="text mt-1 subtitle-2 font-weight-bold">{{ item.display.name }}</div>
                     <div class="text caption font-weight-light">{{ item.display.channelName }}</div>
                     <div class="text caption font-weight-light">{{ item.display.time }} ({{ item.display.duration }} m)</div>
                     <div class="text caption font-regular">{{ item.display.mode }}</div>
                     <div class="text caption font-regular">{{ item.display.encodeInfo }}</div>
                     <v-progress-linear v-if="typeof item.display.percent !== 'undefined'" buffer-value="100" :value="item.display.percent"></v-progress-linear>
+                </div>
+                <div v-if="isEditMode === false" class="right-buttons d-flex flex-column justify-center">
+                    <v-btn icon v-on:click.stop="openCancelDialog">
+                        <v-icon>mdi-close</v-icon>
+                    </v-btn>
+                    <template v-if="isWaitItem">
+                        <v-btn icon v-on:click.stop="$emit('move', 'up')">
+                            <v-icon>mdi-chevron-up</v-icon>
+                        </v-btn>
+                        <v-btn icon v-on:click.stop="$emit('move', 'down')">
+                            <v-icon>mdi-chevron-down</v-icon>
+                        </v-btn>
+                    </template>
                 </div>
             </div>
         </v-card>
@@ -41,6 +47,9 @@ export default class EncodeSmallCard extends Vue {
 
     @Prop({ required: true })
     public isEditMode!: boolean;
+
+    @Prop({ default: false })
+    public isWaitItem!: boolean;
 
     public isOpenCancelDialog: boolean = false;
 
@@ -78,14 +87,10 @@ export default class EncodeSmallCard extends Vue {
             overflow: hidden
             text-overflow: ellipsis
             white-space: nowrap
-        .subtitle-2
-            padding-right: 30px
         .dummy
             visibility: hidden
 
-    .menu-wrap
-        position: absolute
-        right: 0
-        margin-top: 2px
-        margin-right: 4px
+    .right-buttons
+        flex-shrink: 0
+        padding: 0 4px
 </style>

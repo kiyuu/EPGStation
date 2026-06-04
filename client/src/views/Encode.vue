@@ -23,7 +23,13 @@
                 </div>
                 <div v-if="encodeState.getEncodeInfo().waitItems.length > 0">
                     <div class="title pt-2">待機中</div>
-                    <EncodeItems :items="encodeState.getEncodeInfo().waitItems" :isEditMode.sync="isEditMode" v-on:selected="selectItem"></EncodeItems>
+                    <EncodeItems
+                        :items="encodeState.getEncodeInfo().waitItems"
+                        :isEditMode.sync="isEditMode"
+                        :isWaitItems="true"
+                        v-on:selected="selectItem"
+                        v-on:move="onMove"
+                    ></EncodeItems>
                 </div>
                 <div style="visibility: hidden">dummy</div>
             </div>
@@ -106,6 +112,15 @@ export default class Encode extends Vue {
 
     public selectItem(ruleId: apid.ReserveId): void {
         this.encodeState.select(ruleId);
+    }
+
+    public async onMove(encodeId: apid.EncodeId, direction: 'up' | 'down'): Promise<void> {
+        try {
+            await this.encodeState.moveWaitItem(encodeId, direction);
+        } catch (err) {
+            this.snackbarState.open({ color: 'error', text: '順番変更に失敗しました。' });
+            console.error(err);
+        }
     }
 
     public onMultiplueDeletion(): void {

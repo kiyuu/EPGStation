@@ -29,4 +29,5 @@ export default interface IEncodeState {
     selectAll(): void;
     clearSelect(): void;
     multiplueDeletion(): Promise<void>;
+    moveWaitItem(encodeId: apid.EncodeId, direction: 'up' | 'down'): Promise<void>;
 }

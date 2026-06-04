@@ -1,7 +1,13 @@
 <template>
     <div>
         <div v-for="item in items" v-bind:key="item.encodeItem.id">
-            <EncodeSmallCard :item="item" :isEditMode.sync="isEditMode" v-on:selected="selected"></EncodeSmallCard>
+            <EncodeSmallCard
+                :item="item"
+                :isEditMode.sync="isEditMode"
+                :isWaitItem="isWaitItems"
+                v-on:selected="selected"
+                v-on:move="dir => $emit('move', item.encodeItem.id, dir)"
+            ></EncodeSmallCard>
         </div>
     </div>
 </template>
@@ -23,6 +29,9 @@ export default class EncodeItems extends Vue {
 
     @Prop({ required: true })
     public isEditMode!: boolean;
+
+    @Prop({ default: false })
+    public isWaitItems!: boolean;
 
     public selected(encodeId: apid.EncodeId): void {
         this.$emit('selected', encodeId);
