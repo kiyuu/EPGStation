@@ -136,6 +136,7 @@ export default interface IConfigFile {
     encodeProcessNum: number; // エンコード、ストリーミング最大プロセス数
     concurrentEncodeNum: number; // 同時エンコード数
     encodeModeGroups?: string[][]; // モードグループ定義（設定時はグループ数が同時エンコード数になる）
+    encodePriorityTitles?: { title: string; priority: number }[]; // 番組タイトル優先度定義（部分一致・1〜5・未設定=3）
     encode: {
         name: string;
         cmd: string;

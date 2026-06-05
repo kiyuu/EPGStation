@@ -2,6 +2,7 @@ import * as apid from '../../../../api';
 
 export interface EncodeOption extends apid.AddEncodeProgramOption {
     encodeId: apid.EncodeId;
+    priority?: number;
 }
 
 export interface EncodeProgressInfo {
