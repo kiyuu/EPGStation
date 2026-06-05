@@ -8,6 +8,7 @@ import IConfiguration from '../../IConfiguration';
 import IExecutionManagementModel from '../../IExecutionManagementModel';
 import ILogger from '../../ILogger';
 import ILoggerModel from '../../ILoggerModel';
+import IRecordedDB from '../../db/IRecordedDB';
 import IEncodeManageModel, { EncodeInfoItem, EncodeQueueInfo, EncodeRecordedIdIndex } from './IEncodeManageModel';
 import { EncodeOption, EncoderModelProvider, IEncoderModel } from './IEncoderModel';
 
@@ -19,6 +20,8 @@ class EncodeManageModel implements IEncodeManageModel {
     private encodeEvent: IEncodeEvent;
     private concurrentEncodeNum: number;
     private encodeModeGroups: string[][] | null;
+    private recordedDB: IRecordedDB;
+    private encodePriorityTitles: { title: string; priority: number }[] | null;
     private waitQueue: IEncoderModel[] = [];
     private runningQueue: IEncoderModel[] = [];
     private idCnt: number = 1;
@@ -31,16 +34,19 @@ class EncodeManageModel implements IEncodeManageModel {
         @inject('IExecutionManagementModel') executeManagementModel: IExecutionManagementModel,
         @inject('EncoderModelProvider') encoderModelProvider: EncoderModelProvider,
         @inject('IEncodeEvent') encodeEvent: IEncodeEvent,
+        @inject('IRecordedDB') recordedDB: IRecordedDB,
     ) {
         this.log = logger.getLogger();
         this.executeManagementModel = executeManagementModel;
         const config = configure.getConfig();
         this.encodeModeGroups = config.encodeModeGroups ?? null;
+        this.encodePriorityTitles = config.encodePriorityTitles ?? null;
         this.concurrentEncodeNum = this.encodeModeGroups !== null
             ? this.encodeModeGroups.length + 1 // 定義グループ数 + その他グループ
             : config.concurrentEncodeNum;
         this.encoderModelProvider = encoderModelProvider;
         this.encodeEvent = encodeEvent;
+        this.recordedDB = recordedDB;
 
         this.listener.on(EncodeManageModel.NEEDS_CHECK_QUEUE_EVENT, this.checkQueue.bind(this));
     }
@@ -61,10 +67,17 @@ class EncodeManageModel implements IEncodeManageModel {
         // encoder を生成する
         const encoder = await this.encoderModelProvider();
         const option = this.createEncodeOption(addOption);
+
+        // 優先度設定
+        if (this.encodePriorityTitles !== null) {
+            const recorded = await this.recordedDB.findId(addOption.recordedId);
+            option.priority = recorded !== null ? this.getPriorityByTitle(recorded.name) : 3;
+        }
+
         encoder.setOption(option);
 
         // queue に積む
-        this.waitQueue.push(encoder);
+        this.insertToWaitQueue(encoder);
         this.emitNeedsCheckQueue();
 
         this.log.encode.info(`add new encode: ${option.encodeId}`);
@@ -121,6 +134,32 @@ class EncodeManageModel implements IEncodeManageModel {
         }
 
         this.executeManagementModel.unLockExecution(exeId);
+    }
+
+    private getPriorityByTitle(name: string): number {
+        if (this.encodePriorityTitles === null) return 3;
+        for (const entry of this.encodePriorityTitles) {
+            if (name.includes(entry.title)) return entry.priority;
+        }
+        return 3;
+    }
+
+    private insertToWaitQueue(encoder: IEncoderModel): void {
+        const opt = encoder.getEncodeOption();
+        const priority = opt !== null ? (opt.priority ?? 3) : 3;
+        if (this.encodePriorityTitles === null) {
+            this.waitQueue.push(encoder);
+            return;
+        }
+        let insertIdx = 0;
+        for (let i = this.waitQueue.length - 1; i >= 0; i--) {
+            const itemOpt = this.waitQueue[i].getEncodeOption();
+            if ((itemOpt !== null ? (itemOpt.priority ?? 3) : 3) >= priority) {
+                insertIdx = i + 1;
+                break;
+            }
+        }
+        this.waitQueue.splice(insertIdx, 0, encoder);
     }
 
     private getGroupId(mode: string): number {
