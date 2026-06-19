@@ -247,7 +247,7 @@ export default class EncodeState implements IEncodeState {
         }
     }
 
-    public async moveWaitItem(encodeId: apid.EncodeId, direction: 'up' | 'down'): Promise<void> {
+    public async moveWaitItem(encodeId: apid.EncodeId, direction: 'up' | 'down' | 'top' | 'bottom'): Promise<void> {
         await this.encodeApiModel.move(encodeId, direction);
         await this.fetchData(this.lastIsHalfWidth);
     }

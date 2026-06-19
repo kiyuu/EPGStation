@@ -114,7 +114,7 @@ export default class Encode extends Vue {
         this.encodeState.select(ruleId);
     }
 
-    public async onMove(encodeId: apid.EncodeId, direction: 'up' | 'down'): Promise<void> {
+    public async onMove(encodeId: apid.EncodeId, direction: 'up' | 'down' | 'top' | 'bottom'): Promise<void> {
         try {
             await this.encodeState.moveWaitItem(encodeId, direction);
         } catch (err) {

@@ -157,7 +157,7 @@ export default class EncodeApiModel implements IEncodeApiModel {
         await this.encodeManage.cancel(encodeId);
     }
 
-    public move(encodeId: apid.EncodeId, direction: 'up' | 'down'): void {
+    public move(encodeId: apid.EncodeId, direction: 'up' | 'down' | 'top' | 'bottom'): void {
         this.encodeManage.moveWaitQueue(encodeId, direction);
     }
 }
