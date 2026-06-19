@@ -284,6 +284,7 @@ $switch-display-width: 800px
 
 .description, .extended
     white-space: pre-wrap
+    overflow-wrap: break-word
 
 @media screen and (min-width: $switch-display-width)
     .content-0
