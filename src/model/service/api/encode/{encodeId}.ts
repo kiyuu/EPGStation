@@ -45,11 +45,11 @@ export const put: Operation = async (req, res) => {
 
     try {
         const direction = req.body.direction as string;
-        if (direction !== 'up' && direction !== 'down') {
+        if (direction !== 'up' && direction !== 'down' && direction !== 'top' && direction !== 'bottom') {
             api.responseServerError(res, 'InvalidDirection');
             return;
         }
-        encodeApiModel.move(parseInt(req.params.encodeId, 10), direction as 'up' | 'down');
+        encodeApiModel.move(parseInt(req.params.encodeId, 10), direction as 'up' | 'down' | 'top' | 'bottom');
         api.responseJSON(res, 200, { code: 200 });
     } catch (err: any) {
         api.responseServerError(res, err.message);
@@ -73,7 +73,7 @@ put.apiDoc = {
                     properties: {
                         direction: {
                             type: 'string',
-                            enum: ['up', 'down'],
+                            enum: ['up', 'down', 'top', 'bottom'],
                         },
                     },
                     required: ['direction'],

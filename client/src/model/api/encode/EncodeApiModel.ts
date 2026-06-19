@@ -46,7 +46,7 @@ export default class EncodeApiModel implements IEncodeApiModel {
         await this.repository.delete(`/encode/${encodeId.toString(10)}`);
     }
 
-    public async move(encodeId: apid.EncodeId, direction: 'up' | 'down'): Promise<void> {
+    public async move(encodeId: apid.EncodeId, direction: 'up' | 'down' | 'top' | 'bottom'): Promise<void> {
         await this.repository.put(`/encode/${encodeId.toString(10)}`, { direction });
     }
 }

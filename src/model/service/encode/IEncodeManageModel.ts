@@ -26,5 +26,5 @@ export default interface IEncodeManageModel {
     getRecordedIndex(): EncodeRecordedIdIndex;
     cancelEncodeByRecordedId(recordedId: apid.RecordedId): Promise<void>;
     getEncodeInfo(): EncodeQueueInfo;
-    moveWaitQueue(encodeId: apid.EncodeId, direction: 'up' | 'down'): void;
+    moveWaitQueue(encodeId: apid.EncodeId, direction: 'up' | 'down' | 'top' | 'bottom'): void;
 }

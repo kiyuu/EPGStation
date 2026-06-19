@@ -11,16 +11,32 @@
                     <div class="text caption font-regular">{{ item.display.encodeInfo }}</div>
                     <v-progress-linear v-if="typeof item.display.percent !== 'undefined'" buffer-value="100" :value="item.display.percent"></v-progress-linear>
                 </div>
-                <div v-if="isEditMode === false" class="right-buttons d-flex flex-column justify-start">
-                    <v-btn icon v-on:click.stop="openCancelDialog">
-                        <v-icon>mdi-close</v-icon>
-                    </v-btn>
+                <div v-if="isEditMode === false" class="right-buttons d-flex justify-start">
                     <template v-if="isWaitItem">
-                        <v-btn icon v-on:click.stop="$emit('move', 'up')">
-                            <v-icon>mdi-chevron-up</v-icon>
-                        </v-btn>
-                        <v-btn icon v-on:click.stop="$emit('move', 'down')">
-                            <v-icon>mdi-chevron-down</v-icon>
+                        <div class="d-flex flex-column">
+                            <div class="btn-spacer"></div>
+                            <v-btn icon v-on:click.stop="$emit('move', 'up')">
+                                <v-icon>mdi-chevron-up</v-icon>
+                            </v-btn>
+                            <v-btn icon v-on:click.stop="$emit('move', 'down')">
+                                <v-icon>mdi-chevron-down</v-icon>
+                            </v-btn>
+                        </div>
+                        <div class="d-flex flex-column">
+                            <v-btn icon v-on:click.stop="openCancelDialog">
+                                <v-icon>mdi-close</v-icon>
+                            </v-btn>
+                            <v-btn icon v-on:click.stop="$emit('move', 'top')">
+                                <v-icon>mdi-arrow-collapse-up</v-icon>
+                            </v-btn>
+                            <v-btn icon v-on:click.stop="$emit('move', 'bottom')">
+                                <v-icon>mdi-arrow-collapse-down</v-icon>
+                            </v-btn>
+                        </div>
+                    </template>
+                    <template v-else>
+                        <v-btn icon v-on:click.stop="openCancelDialog">
+                            <v-icon>mdi-close</v-icon>
                         </v-btn>
                     </template>
                 </div>
@@ -93,4 +109,6 @@ export default class EncodeSmallCard extends Vue {
     .right-buttons
         flex-shrink: 0
         padding: 0 4px
+    .btn-spacer
+        height: 36px
 </style>
