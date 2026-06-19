@@ -156,6 +156,8 @@ export default interface IConfigFile {
     recordingStartCommand?: string; // 録画開始
     recordingFinishCommand?: string; // 録画終了
     recordingFailedCommand?: string; // 録画中のエラー
+    encodingBeforeAddQueCommand?: string; // エンコードキュー登録直前
+    encodingBeforeStartCommand?: string; // エンコード開始直前
     encodingFinishCommand?: string; // エンコード終了
 
     // 視聴 URL Scheme 設定

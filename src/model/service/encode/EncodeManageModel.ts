@@ -1,3 +1,4 @@
+import { spawn } from 'child_process';
 import * as path from 'path';
 import * as events from 'events';
 import { inject, injectable } from 'inversify';
@@ -9,6 +10,7 @@ import IExecutionManagementModel from '../../IExecutionManagementModel';
 import ILogger from '../../ILogger';
 import ILoggerModel from '../../ILoggerModel';
 import IRecordedDB from '../../db/IRecordedDB';
+import ProcessUtil from '../../../util/ProcessUtil';
 import IEncodeManageModel, { EncodeInfoItem, EncodeQueueInfo, EncodeRecordedIdIndex } from './IEncodeManageModel';
 import { EncodeOption, EncoderModelProvider, IEncoderModel } from './IEncoderModel';
 
@@ -26,6 +28,8 @@ class EncodeManageModel implements IEncodeManageModel {
     private runningQueue: IEncoderModel[] = [];
     private idCnt: number = 1;
 
+    private encodingBeforeAddQueCommand: string | undefined;
+    private encodingBeforeStartCommand: string | undefined;
     private listener: events.EventEmitter = new events.EventEmitter();
 
     constructor(
@@ -44,6 +48,8 @@ class EncodeManageModel implements IEncodeManageModel {
         this.concurrentEncodeNum = this.encodeModeGroups !== null
             ? this.encodeModeGroups.length + 1 // 定義グループ数 + その他グループ
             : config.concurrentEncodeNum;
+        this.encodingBeforeAddQueCommand = config.encodingBeforeAddQueCommand;
+        this.encodingBeforeStartCommand = config.encodingBeforeStartCommand;
         this.encoderModelProvider = encoderModelProvider;
         this.encodeEvent = encodeEvent;
         this.recordedDB = recordedDB;
@@ -60,6 +66,8 @@ class EncodeManageModel implements IEncodeManageModel {
         if (this.concurrentEncodeNum <= 0) {
             throw new Error('CncurrentEncodeNumIsZero');
         }
+
+        await this.runBeforeAddQueCommand(addOption);
 
         // 実行権取得
         const exeId = await this.executeManagementModel.getExecution(EncodeManageModel.ADD_ENCODE_PRIPORITY);
@@ -127,13 +135,24 @@ class EncodeManageModel implements IEncodeManageModel {
             EncodeManageModel.CREATE_ENCODING_PROCESS_PRIPORITY,
         );
 
-        if (this.encodeModeGroups !== null) {
-            await this.checkQueueWithGroups();
-        } else {
-            await this.checkQueueDefault();
-        }
+        const pendingStarts: Array<{ encoder: IEncoderModel; option: EncodeOption }> =
+            this.encodeModeGroups !== null
+                ? this.checkQueueWithGroups()
+                : (() => { const r = this.checkQueueDefault(); return r !== null ? [r] : []; })();
 
         this.executeManagementModel.unLockExecution(exeId);
+
+        for (const { encoder, option } of pendingStarts) {
+            await this.runBeforeStartCommand(option);
+            try {
+                await encoder.start();
+            } catch (err: any) {
+                this.log.encode.error(`create encode process error: ${encoder.getEncodeId()}`);
+                this.log.encode.error(err);
+                this.encodeEvent.emitErrorEncode();
+                this.finalize(option.encodeId);
+            }
+        }
     }
 
     private getPriorityByTitle(name: string): number {
@@ -180,7 +199,9 @@ class EncodeManageModel implements IEncodeManageModel {
         return this.encodeModeGroups.length; // その他グループ
     }
 
-    private async checkQueueWithGroups(): Promise<void> {
+    private checkQueueWithGroups(): Array<{ encoder: IEncoderModel; option: EncodeOption }> {
+        const results: Array<{ encoder: IEncoderModel; option: EncodeOption }> = [];
+
         while (this.runningQueue.length < this.concurrentEncodeNum && this.waitQueue.length > 0) {
             const runningGroupIds = new Set(
                 this.runningQueue
@@ -217,31 +238,26 @@ class EncodeManageModel implements IEncodeManageModel {
                 this.onFinish(isError, outputFilePath, encodeOption);
             });
 
-            try {
-                await encoder.start();
-            } catch (err: any) {
-                this.log.encode.error(`create encode process error: ${encoder.getEncodeId()}`);
-                this.log.encode.error(err);
-                this.encodeEvent.emitErrorEncode();
-                this.finalize(encodeOption.encodeId);
-            }
+            results.push({ encoder, option: encodeOption });
         }
+
+        return results;
     }
 
-    private async checkQueueDefault(): Promise<void> {
+    private checkQueueDefault(): { encoder: IEncoderModel; option: EncodeOption } | null {
         if (this.runningQueue.length >= this.concurrentEncodeNum || this.waitQueue.length === 0) {
-            return;
+            return null;
         }
 
         const encoder = this.waitQueue.shift();
         if (typeof encoder === 'undefined') {
-            return;
+            return null;
         }
 
         const encodeOption = encoder.getEncodeOption();
         if (encodeOption === null) {
             this.log.encode.warn('encodeOption is null');
-            return;
+            return null;
         }
 
         this.runningQueue.push(encoder);
@@ -250,19 +266,89 @@ class EncodeManageModel implements IEncodeManageModel {
             this.onFinish(isError, outputFilePath, encodeOption);
         });
 
-        let needsFinalize = false;
-        try {
-            await encoder.start();
-        } catch (err: any) {
-            this.log.encode.error(`create encode process error: ${encoder.getEncodeId()}`);
-            this.log.encode.error(err);
-            needsFinalize = true;
-            this.encodeEvent.emitErrorEncode();
-        }
+        return { encoder, option: encodeOption };
+    }
 
-        if (needsFinalize === true) {
-            this.finalize(encodeOption.encodeId);
+    private async runBeforeAddQueCommand(addOption: apid.AddEncodeProgramOption): Promise<void> {
+        if (typeof this.encodingBeforeAddQueCommand === 'undefined') {
+            return;
         }
+        this.log.encode.info(`encodingBeforeAddQueCommand: ${this.encodingBeforeAddQueCommand}`);
+        const cmds = ProcessUtil.parseCmdStr(this.encodingBeforeAddQueCommand);
+        await new Promise<void>(resolve => {
+            const child = spawn(cmds.bin, cmds.args, {
+                stdio: 'ignore',
+                env: {
+                    PATH: process.env['PATH'],
+                    RECORDEDID: addOption.recordedId.toString(),
+                    VIDEOFILEID: addOption.sourceVideoFileId.toString(),
+                    MODE: addOption.mode,
+                },
+            } as any);
+            child.on('exit', () => {
+                if (child.exitCode === 0) {
+                    this.log.encode.info('encodingBeforeAddQueCommand: finish');
+                } else {
+                    this.log.encode.error(`encodingBeforeAddQueCommand: failed. exit: ${child.exitCode}`);
+                }
+                resolve();
+            });
+            child.on('error', err => {
+                this.log.encode.error('encodingBeforeAddQueCommand: error');
+                this.log.encode.error(err);
+                resolve();
+            });
+            if (ProcessUtil.isExited(child) === true) {
+                child.removeAllListeners();
+                if (child.exitCode === 0) {
+                    this.log.encode.info('encodingBeforeAddQueCommand: finish');
+                } else {
+                    this.log.encode.error('encodingBeforeAddQueCommand: failed');
+                }
+                resolve();
+            }
+        });
+    }
+
+    private async runBeforeStartCommand(option: EncodeOption): Promise<void> {
+        if (typeof this.encodingBeforeStartCommand === 'undefined') {
+            return;
+        }
+        this.log.encode.info(`encodingBeforeStartCommand: ${this.encodingBeforeStartCommand}`);
+        const cmds = ProcessUtil.parseCmdStr(this.encodingBeforeStartCommand);
+        await new Promise<void>(resolve => {
+            const child = spawn(cmds.bin, cmds.args, {
+                stdio: 'ignore',
+                env: {
+                    PATH: process.env['PATH'],
+                    RECORDEDID: option.recordedId,
+                    VIDEOFILEID: option.sourceVideoFileId,
+                    MODE: option.mode,
+                },
+            } as any);
+            child.on('exit', () => {
+                if (child.exitCode === 0) {
+                    this.log.encode.info('encodingBeforeStartCommand: finish');
+                } else {
+                    this.log.encode.error(`encodingBeforeStartCommand: failed. exit: ${child.exitCode}`);
+                }
+                resolve();
+            });
+            child.on('error', err => {
+                this.log.encode.error('encodingBeforeStartCommand: error');
+                this.log.encode.error(err);
+                resolve();
+            });
+            if (ProcessUtil.isExited(child) === true) {
+                child.removeAllListeners();
+                if (child.exitCode === 0) {
+                    this.log.encode.info('encodingBeforeStartCommand: finish');
+                } else {
+                    this.log.encode.error('encodingBeforeStartCommand: failed');
+                }
+                resolve();
+            }
+        });
     }
 
     /**

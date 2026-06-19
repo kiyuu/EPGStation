@@ -784,6 +784,46 @@ recordingFinishCommand: '/bin/bash /home/hoge/foo.sh end'
 recordingFailedCommand: '/usr/bin/logger recfailed'
 ```
 
+### encodingBeforeAddQueCommand
+
+-   エンコードキュー登録直前に実行するコマンド（コマンド終了後にキューへ登録する）
+
+| 種類   | デフォルト値 | 必須 |
+| ------ | ------------ | ---- |
+| string | -            | no   |
+
+-   実行時に渡される環境変数は以下の通り
+
+| 変数名      | 種類   | 説明                  |
+| ----------- | ------ | --------------------- |
+| RECORDEDID  | number | recorded id           |
+| VIDEOFILEID | number | ソース動画ファイル id |
+| MODE        | string | エンコードモード名    |
+
+```yaml
+encodingBeforeAddQueCommand: '/bin/node /app/config/CheckBeforeAdd.js'
+```
+
+### encodingBeforeStartCommand
+
+-   エンコード開始直前に実行するコマンド（コマンド終了後にエンコードを開始する）
+
+| 種類   | デフォルト値 | 必須 |
+| ------ | ------------ | ---- |
+| string | -            | no   |
+
+-   実行時に渡される環境変数は以下の通り
+
+| 変数名      | 種類   | 説明                  |
+| ----------- | ------ | --------------------- |
+| RECORDEDID  | number | recorded id           |
+| VIDEOFILEID | number | ソース動画ファイル id |
+| MODE        | string | エンコードモード名    |
+
+```yaml
+encodingBeforeStartCommand: '/bin/node /home/hoge/delete-encoded.js'
+```
+
 ### encodingFinishCommand
 
 -   エンコード終了時に実行するコマンド
