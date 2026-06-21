@@ -36,6 +36,8 @@ export default class SocketIOManageModel implements ISocketIOManageModel {
                     cors: {
                         origin: '*',
                     },
+                    pingTimeout: 60000,
+                    pingInterval: 30000,
                 }),
             );
         }
