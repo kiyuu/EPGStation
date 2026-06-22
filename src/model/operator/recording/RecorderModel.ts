@@ -203,7 +203,11 @@ class RecorderModel implements IRecorderModel {
 
             this.log.system.error(`preprec failed: ${this.reserve.id}`);
             this.log.system.error(err);
-            if (retry < 3) {
+            if (err.name === 'DiskSpaceError') {
+                this.log.system.fatal(`disk space error, skip retry: ${this.reserve.id}`);
+                this.isPrepRecording = false;
+                this.recordingEvent.emitPrepRecordingFailed(this.reserve);
+            } else if (retry < 3) {
                 // retry
                 setTimeout(() => {
                     this.prepRecord(retry + 1);
@@ -308,13 +312,28 @@ class RecorderModel implements IRecorderModel {
             if (this.stream === null) {
                 this.cancel(false);
             } else {
-                this.isCanceledCallingFinished = true; // mirakurun の stream の終了処理を行わないようにセット
-                await this.recFailed(err).catch(err => {
+                this.isCanceledCallingFinished = true;
+                if ((err as any).code === 'ENOSPC') {
                     this.log.system.fatal(
-                        `Unexpected recFailed error: reserveId: ${this.reserve.id}, recordedId: ${this.recordedId}`,
+                        `disk full during recording reserveId: ${this.reserve.id}, recordedId: ${this.recordedId}`,
                     );
-                    this.log.system.fatal(err);
-                });
+                    this.destroyStream();
+                    this.isNeedDeleteReservation = false;
+                    await this.recEnd().catch(e => {
+                        this.log.system.fatal(
+                            `recEnd error: reserveId: ${this.reserve.id}, recordedId: ${this.recordedId}`,
+                        );
+                        this.log.system.fatal(e);
+                    });
+                    this.recordingEvent.emitRecordingRetryOver(this.reserve);
+                } else {
+                    await this.recFailed(err).catch(err => {
+                        this.log.system.fatal(
+                            `Unexpected recFailed error: reserveId: ${this.reserve.id}, recordedId: ${this.recordedId}`,
+                        );
+                        this.log.system.fatal(err);
+                    });
+                }
             }
         });
         this.stream.pipe(this.recFile);
