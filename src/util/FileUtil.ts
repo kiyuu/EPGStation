@@ -62,6 +62,38 @@ namespace FileUtil {
     };
 
     /**
+     * ディスク空き容量チェック
+     * @param dirPath: directory path
+     * @param minBytes: minimum free bytes required
+     */
+    export const checkDiskSpace = (dirPath: string, minBytes: number): Promise<void> => {
+        return new Promise<void>((reslove: () => void, reject: (error: Error) => void) => {
+            if (typeof (fs as any).statfs !== 'function') {
+                reslove();
+
+                return;
+            }
+            (fs as any).statfs(dirPath, (err: any, stats: any) => {
+                if (err) {
+                    reslove();
+
+                    return;
+                }
+                const freeBytes = BigInt(stats.bavail) * BigInt(stats.bsize);
+                if (freeBytes < BigInt(minBytes)) {
+                    const freeMB = Number(freeBytes / BigInt(1024 * 1024));
+                    const needMB = Math.ceil(minBytes / (1024 * 1024));
+                    const error = new Error(`DiskSpaceError: ${freeMB}MB free, need ${needMB}MB`);
+                    error.name = 'DiskSpaceError';
+                    reject(error);
+                } else {
+                    reslove();
+                }
+            });
+        });
+    };
+
+    /**
      * ファイルサイズ取得
      * @param filePath: string
      * @return Promise<number?

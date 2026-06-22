@@ -138,6 +138,9 @@ class RecordingUtilModel implements IRecordingUtilModel {
             }
         }
 
+        // ディスク容量チェック（不足時はファイル作成前にエラー）
+        await FileUtil.checkDiskSpace(dir, RecordingUtilModel.MIN_DISK_SPACE);
+
         const newFileName = await this.getFileName(parentDir.path, subDir, fileName, this.config.recordedFileExtension);
 
         return {
@@ -352,6 +355,7 @@ class RecordingUtilModel implements IRecordingUtilModel {
 namespace RecordingUtilModel {
     export const GET_REC_PATH_LOCK_TIMEOUT = 5.0 * 1000;
     export const GET_REC_PATH_PRIORITY = 1;
+    export const MIN_DISK_SPACE = 100 * 1024 * 1024; // 100MB
 }
 
 export default RecordingUtilModel;
