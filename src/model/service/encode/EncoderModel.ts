@@ -16,7 +16,7 @@ import ILogger from '../../ILogger';
 import ILoggerModel from '../../ILoggerModel';
 import IEncodeFileManageModel from './IEncodeFileManageModel';
 import IEncodeProcessManageModel from './IEncodeProcessManageModel';
-import { EncodeOption, EncodeProgressInfo, IEncoderModel } from './IEncoderModel';
+import { EncodeInputVideoFileInfo, EncodeOption, EncodeProgressInfo, IEncoderModel } from './IEncoderModel';
 import IRecordingUtilModel from '../../operator/recording/IRecordingUtilModel';
 
 @injectable()
@@ -39,6 +39,7 @@ class EncoderModel implements IEncoderModel {
     private timerId: NodeJS.Timer | null = null; // タイムアウト検知用タイマーid
     private isCanceld: boolean = false; // キャンセルが呼び出されたか?
     private progressInfo: EncodeProgressInfo | null = null;
+    private inputVideoFileInfo!: EncodeInputVideoFileInfo;
 
     constructor(
         @inject('ILoggerModel') logger: ILoggerModel,
@@ -81,9 +82,15 @@ class EncoderModel implements IEncoderModel {
      * エンコード終了イベント登録
      * @param callback
      */
-    public setOnFinish(callback: (isError: boolean, outputFilePath: string | null) => void): void {
+    public setOnFinish(
+        callback: (
+            isError: boolean,
+            outputFilePath: string | null,
+            inputVideoFileInfo: EncodeInputVideoFileInfo,
+        ) => void,
+    ): void {
         this.listener.once(EncoderModel.ENCODE_FINISH_EVENT, (isError: boolean, outputFilePath: string | null) => {
-            callback(isError, outputFilePath);
+            callback(isError, outputFilePath, this.inputVideoFileInfo);
         });
     }
 
@@ -120,6 +127,12 @@ class EncoderModel implements IEncoderModel {
             throw new Error('VideoPathIsNotFound');
         }
 
+        this.inputVideoFileInfo = {
+            inputPath: inputFilePath,
+            displayName: video.name,
+            type: video.type as apid.VideoFileType,
+        };
+
         // ソースビデオファイルの存在を確認
         try {
             await FileUtil.stat(inputFilePath);
@@ -154,7 +167,11 @@ class EncoderModel implements IEncoderModel {
         const outputFilePath =
             outputDirPath === null || typeof encodeCmd.suffix === 'undefined'
                 ? null
-                : await this.fileManager.getFilePath(outputDirPath, inputFilePath, encodeCmd.suffix);
+                : await this.fileManager.getFilePath(
+                      outputDirPath,
+                      inputFilePath,
+                      encodeCmd.suffix,
+                  );
 
         const config = this.configure.getConfig();
 

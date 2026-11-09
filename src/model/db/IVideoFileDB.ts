@@ -10,6 +10,7 @@ export interface UpdateFilePathOption {
 export default interface IVideoFileDB {
     restore(items: VideoFile[]): Promise<void>;
     insertOnce(videoFile: VideoFile): Promise<apid.VideoFileId>;
+    insertMany(videoFiles: VideoFile[]): Promise<apid.VideoFileId[]>;
     updateFilePath(option: UpdateFilePathOption): Promise<void>;
     updateSize(videoFileId: apid.VideoFileId, size: number): Promise<void>;
     deleteOnce(VideoFileId: apid.VideoFileId): Promise<void>;

@@ -834,12 +834,16 @@ encodingBeforeStartCommand: '/bin/node /home/hoge/delete-encoded.js'
 
 -   実行時に渡される環境変数は以下の通り
 
-| 変数名                 | 種類           | 説明                                   |
-| ---------------------- | -------------- | -------------------------------------- |
-| RECORDEDID             | number         | recorded id                            |
-| VIDEOFILEID            | number \| null | video file id                          |
-| OUTPUTPATH             | string \| null | エンコードしたビデオファイルのフルパス |
-| MODE                   | string         | エンコードモード名                     |
+| 変数名                 | 種類           | 説明                                                                                 |
+| ---------------------- | -------------- | ------------------------------------------------------------------------------------ |
+| RECORDEDID             | number         | recorded id                                                                          |
+| VIDEOFILEID            | number \| null | 今回登録した先頭の video file id（互換用）                                           |
+| VIDEOFILEIDS           | string         | 今回登録した video file id の JSON 配列。分割出力は `_div1` からの順                 |
+| OUTPUTPATH             | string \| null | 今回登録した先頭ビデオファイルのフルパス（互換用）                                  |
+| INPUT                  | string         | エンコード開始時点の入力ファイルパス。入力 VideoFile の削除後もパス文字列を渡す      |
+| INPUTVIDEOFILE_NAME    | string         | 入力 VideoFile.name の値（例: `TS`、`mode`、`mode_div1`）。実ファイル名ではない      |
+| INPUTVIDEOFILE_TYPE    | string         | エンコード開始時点の入力 VideoFile.type（`ts` または `encoded`）                     |
+| MODE                   | string         | エンコードモード名                                                                   |
 | CHANNELID              | number         | channel id                             |
 | CHANNELNAME            | string \| null | 放送局名                               |
 | HALF_WIDTH_CHANNELNAME | string \| null | 放送局名(半角)                         |

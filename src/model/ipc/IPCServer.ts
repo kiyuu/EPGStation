@@ -245,6 +245,13 @@ export default class IPCServer implements IIPCServer {
             return await this.recordedManage.addVideoFile(option);
         };
 
+        // addVideoFiles
+        index[RecordedFunctions.addVideoFiles] = async msg => {
+            const options = this.getArgsValue<AddVideoFileOption[]>(msg, 'options');
+
+            return await this.recordedManage.addVideoFiles(options);
+        };
+
         // addUploadedVideoFile
         index[RecordedFunctions.addUploadedVideoFile] = async msg => {
             const option = this.getArgsValue<UploadedVideoFileOption>(msg, 'option');

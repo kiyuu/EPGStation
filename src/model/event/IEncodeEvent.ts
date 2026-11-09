@@ -8,6 +8,9 @@ export interface FinishEncodeInfo {
     fullOutputPath: string | null; // 出力したファイルのフルパス
     mode: string; // エンコードモード名
     removeOriginal: boolean; // ts を削除するか
+    inputPath: string; // エンコード開始時点の入力パス
+    inputVideoFileDisplayName: string; // VideoFile.name の値（実ファイル名ではない）
+    inputVideoFileType: apid.VideoFileType;
 }
 
 export default interface IEncodeEvent {

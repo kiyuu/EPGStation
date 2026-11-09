@@ -15,12 +15,15 @@ export default class EncodeFileManageModel implements IEncodeFileManageModel {
      * @param suffix: 拡張子
      * @returns 出力先パス
      */
-    public async getFilePath(outputDirPath: string, inputFilePath: string, suffix: string): Promise<string> {
+    public async getFilePath(
+        outputDirPath: string,
+        inputFilePath: string,
+        suffix: string,
+    ): Promise<string> {
         const basefileName = path.basename(inputFilePath, path.extname(inputFilePath));
 
-        let result: string | null = null;
         let conflict = 0;
-        while (1) {
+        while (true) {
             // ファイル名生成
             let fileName = basefileName;
             if (conflict > 0) {
@@ -28,7 +31,7 @@ export default class EncodeFileManageModel implements IEncodeFileManageModel {
             }
             fileName += suffix;
 
-            result = path.join(outputDirPath, fileName);
+            const result = path.join(outputDirPath, fileName);
 
             // 使用済みファイル名に一致するか
             if (typeof this.usedFileNameIndex[result] !== 'undefined') {
@@ -40,20 +43,22 @@ export default class EncodeFileManageModel implements IEncodeFileManageModel {
             try {
                 await FileUtil.stat(result);
                 conflict++;
+                continue;
             } catch (e: any) {
-                // 同名ファイルがすでに存在しなかった
-                break;
+                if (e?.code !== 'ENOENT') {
+                    throw e;
+                }
             }
+
+            // 前段の await 中に同じファイルパスが別エンコードで予約されていないか再確認する。
+            if (typeof this.usedFileNameIndex[result] !== 'undefined') {
+                conflict++;
+                continue;
+            }
+
+            this.usedFileNameIndex[result] = true;
+            return result;
         }
-
-        if (result === null) {
-            throw new Error('GetFilePathError');
-        }
-
-        // 使用済みファイル名として登録する
-        this.usedFileNameIndex[result] = true;
-
-        return result;
     }
 
     /**

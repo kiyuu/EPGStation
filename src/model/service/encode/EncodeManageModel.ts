@@ -12,7 +12,7 @@ import ILoggerModel from '../../ILoggerModel';
 import IRecordedDB from '../../db/IRecordedDB';
 import ProcessUtil from '../../../util/ProcessUtil';
 import IEncodeManageModel, { EncodeInfoItem, EncodeQueueInfo, EncodeRecordedIdIndex } from './IEncodeManageModel';
-import { EncodeOption, EncoderModelProvider, IEncoderModel } from './IEncoderModel';
+import { EncodeInputVideoFileInfo, EncodeOption, EncoderModelProvider, IEncoderModel } from './IEncoderModel';
 
 @injectable()
 class EncodeManageModel implements IEncodeManageModel {
@@ -234,8 +234,8 @@ class EncodeManageModel implements IEncodeManageModel {
 
             this.runningQueue.push(encoder);
 
-            encoder.setOnFinish((isError, outputFilePath) => {
-                this.onFinish(isError, outputFilePath, encodeOption);
+            encoder.setOnFinish((isError, outputFilePath, inputVideoFileInfo) => {
+                this.onFinish(isError, outputFilePath, encodeOption, inputVideoFileInfo);
             });
 
             results.push({ encoder, option: encodeOption });
@@ -262,8 +262,8 @@ class EncodeManageModel implements IEncodeManageModel {
 
         this.runningQueue.push(encoder);
 
-        encoder.setOnFinish((isError, outputFilePath) => {
-            this.onFinish(isError, outputFilePath, encodeOption);
+        encoder.setOnFinish((isError, outputFilePath, inputVideoFileInfo) => {
+            this.onFinish(isError, outputFilePath, encodeOption, inputVideoFileInfo);
         });
 
         return { encoder, option: encodeOption };
@@ -357,7 +357,12 @@ class EncodeManageModel implements IEncodeManageModel {
      * @param outputFilePath: エンコードファイルパス
      * @param encodeOption: エンコードオプション
      */
-    private onFinish(isError: boolean, outputFilePath: string | null, encodeOption: EncodeOption): void {
+    private onFinish(
+        isError: boolean,
+        outputFilePath: string | null,
+        encodeOption: EncodeOption,
+        inputVideoFileInfo: EncodeInputVideoFileInfo,
+    ): void {
         if (isError) {
             // エラー通知
             this.encodeEvent.emitErrorEncode();
@@ -385,6 +390,9 @@ class EncodeManageModel implements IEncodeManageModel {
                 fullOutputPath: outputFilePath,
                 mode: encodeOption.mode,
                 removeOriginal: encodeOption.removeOriginal,
+                inputPath: inputVideoFileInfo.inputPath,
+                inputVideoFileDisplayName: inputVideoFileInfo.displayName,
+                inputVideoFileType: inputVideoFileInfo.type,
             });
         }
 

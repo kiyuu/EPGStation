@@ -83,6 +83,7 @@ export enum RecordedFunctions {
     delete = 'delete',
     updateVideoFileSize = 'updateVideoFileSize',
     addVideoFile = 'addVideoFile',
+    addVideoFiles = 'addVideoFiles',
     addUploadedVideoFile = 'addUploadedVideoFile',
     createNewRecorded = 'createNewRecorded',
     deleteVideoFile = 'deleteVideoFile',

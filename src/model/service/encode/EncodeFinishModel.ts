@@ -1,11 +1,14 @@
 import { inject, injectable } from 'inversify';
+import * as path from 'path';
 import * as apid from '../../../../api';
 import IEncodeEvent, { FinishEncodeInfo } from '../../event/IEncodeEvent';
 import ILogger from '../../ILogger';
 import ILoggerModel from '../../ILoggerModel';
 import IIPCClient from '../../ipc/IIPCClient';
 import ISocketIOManageModel from '../socketio/ISocketIOManageModel';
+import { AddVideoFileOption } from '../../operator/recorded/IRecordedManageModel';
 import IEncodeFinishModel from './IEncodeFinishModel';
+import EncodeOutputUtil from './EncodeOutputUtil';
 
 @injectable()
 export default class EncodeFinishModel implements IEncodeFinishModel {
@@ -55,21 +58,42 @@ export default class EncodeFinishModel implements IEncodeFinishModel {
      * @param info: FinishEncodeInfo
      */
     private async finishEncode(info: FinishEncodeInfo): Promise<void> {
-        let newVideoFileId: apid.VideoFileId | null = null;
+        let newVideoFileIds: apid.VideoFileId[] = [];
         try {
             if (info.fullOutputPath === null || info.filePath === null) {
                 // update file size
                 await this.ipc.recorded.updateVideoFileSize(info.videoFileId);
             } else {
-                // add encode file
-                const id = await this.ipc.recorded.addVideoFile({
-                    recordedId: info.recordedId,
-                    parentDirectoryName: info.parentDirName,
-                    filePath: info.filePath,
-                    type: 'encoded',
-                    name: info.mode,
-                });
-                newVideoFileId = id;
+                const outputSet = await EncodeOutputUtil.resolveEncodeOutputSet(
+                    info.inputPath,
+                    info.inputVideoFileType,
+                    info.inputVideoFileDisplayName,
+                    info.fullOutputPath,
+                );
+                if (outputSet?.kind === 'single') {
+                    // 通常出力が存在する場合は現行の単一ファイル登録経路を使う。
+                    const id = await this.ipc.recorded.addVideoFile({
+                        recordedId: info.recordedId,
+                        parentDirectoryName: info.parentDirName,
+                        filePath: info.filePath,
+                        type: 'encoded',
+                        name: info.mode,
+                    });
+                    newVideoFileIds = [id];
+                } else if (outputSet?.kind === 'split') {
+                    const relativeDirectory = path.dirname(info.filePath);
+                    const options: AddVideoFileOption[] = outputSet.paths.map((outputPath, index) => ({
+                        recordedId: info.recordedId,
+                        parentDirectoryName: info.parentDirName,
+                        filePath: path.join(relativeDirectory, path.basename(outputPath)),
+                        type: 'encoded',
+                        name: `${info.mode}_div${index + 1}`,
+                    }));
+                    newVideoFileIds = await this.ipc.recorded.addVideoFiles(options);
+                } else {
+                    // 欠落・余分・不正な分割出力は部分登録せず、現行の無出力時処理を維持する。
+                    await this.ipc.recorded.updateVideoFileSize(info.videoFileId);
+                }
             }
         } catch (err: any) {
             this.log.encode.error('finish encode error');
@@ -86,8 +110,12 @@ export default class EncodeFinishModel implements IEncodeFinishModel {
         // Operator にイベントを転送
         await this.ipc.encodeEvent.emitFinishEncode({
             recordedId: info.recordedId,
-            videoFileId: newVideoFileId,
+            videoFileId: newVideoFileIds[0] ?? null,
+            videoFileIds: newVideoFileIds,
             mode: info.mode,
+            inputPath: info.inputPath,
+            inputVideoFileDisplayName: info.inputVideoFileDisplayName,
+            inputVideoFileType: info.inputVideoFileType,
         });
     }
 

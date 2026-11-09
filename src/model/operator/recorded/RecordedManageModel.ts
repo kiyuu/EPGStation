@@ -257,6 +257,53 @@ export default class RecordedManageModel implements IRecordedManageModel {
     }
 
     /**
+     * 分割出力一式を、全ファイルのサイズ確認後に DB へ一括登録する。
+     * DB 登録は VideoFileDB の単一トランザクションで行う。
+     */
+    public async addVideoFiles(options: AddVideoFileOption[]): Promise<apid.VideoFileId[]> {
+        if (options.length === 0) {
+            return [];
+        }
+
+        const videoFiles: VideoFile[] = [];
+        for (const option of options) {
+            this.log.system.info(`add video file: ${option.recordedId} ${option.filePath}`);
+
+            const parentDirPath = this.videoUtil.getParentDirPath(option.parentDirectoryName);
+            if (parentDirPath === null) {
+                this.log.system.error(`parent directory is null: ${option.parentDirectoryName}`);
+                throw new Error('ParentDirectoryIsNull');
+            }
+
+            const fileSize = await FileUtil.getFileSize(path.join(parentDirPath, option.filePath));
+            const videoFile = new VideoFile();
+            videoFile.parentDirectoryName = option.parentDirectoryName;
+            videoFile.filePath = option.filePath;
+            videoFile.type = option.type;
+            videoFile.name = option.name;
+            videoFile.size = fileSize;
+            videoFile.recordedId = option.recordedId;
+            videoFiles.push(videoFile);
+        }
+
+        const newVideoFileIds = await this.videoFileDB.insertMany(videoFiles).catch(err => {
+            this.log.system.error('failed to add video files');
+            this.log.system.error(err);
+            throw err;
+        });
+
+        if (newVideoFileIds.length !== options.length) {
+            throw new Error('VideoFileIdsCountMismatch');
+        }
+
+        for (const newVideoFileId of newVideoFileIds) {
+            this.recordedEvent.emitAddVideoFile(newVideoFileId);
+        }
+
+        return newVideoFileIds;
+    }
+
+    /**
      * option で指定されたビデオファイルを追加する
      * @param option: UploadedVideoFileInfo
      * @return Promise<void>

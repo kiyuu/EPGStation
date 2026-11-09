@@ -8,6 +8,7 @@ import IVideoUtil from '../../api/video/IVideoUtil';
 import IChannelDB from '../../db/IChannelDB';
 import IRecordedDB from '../../db/IRecordedDB';
 import { OperatorFinishEncodeInfo } from '../../event/IOperatorEncodeEvent';
+import EncodeFinishEnvUtil from './EncodeFinishEnvUtil';
 import { IReserveUpdateValues } from '../../event/IReserveEvent';
 import IConfigFile from '../../IConfigFile';
 import IConfiguration from '../../IConfiguration';
@@ -351,15 +352,17 @@ export default class ExternalCommandManageModel implements IExternalCommandManag
             throw new Error('ChannelIsNotFound');
         }
 
-        return new Promise<void>(async resolve => {
+        const firstVideoFileId = info.videoFileIds[0] ?? info.videoFileId;
+        const outputPath =
+            firstVideoFileId === null ? null : await this.videoUtil.getFullFilePathFromId(firstVideoFileId);
+        const outputEnv = EncodeFinishEnvUtil.createOutputEnv(info, outputPath);
+
+        return new Promise<void>(resolve => {
             const child = spawn(cmds.bin, cmds.args, {
                 stdio: 'ignore',
                 env: {
                     PATH: process.env['PATH'],
-                    RECORDEDID: info.recordedId,
-                    VIDEOFILEID: info.videoFileId === null ? '' : info.videoFileId,
-                    OUTPUTPATH:
-                        info.videoFileId === null ? null : await this.videoUtil.getFullFilePathFromId(info.videoFileId),
+                    ...outputEnv,
                     MODE: info.mode,
                     NAME: recorded.name,
                     HALF_WIDTH_NAME: recorded.halfWidthName,

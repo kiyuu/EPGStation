@@ -20,7 +20,7 @@
         "v1migrate": "node dist/V1MigrationTool.js -i",
         "install-win-service": "winser -i -a",
         "uninstall-win-service": "winser -r -x",
-        "test": "echo \"Error: no test specified\" && exit 1"
+        "test": "npm run compile && node --test tests/encode-output.test.js"
     },
     "repository": {
         "type": "git",

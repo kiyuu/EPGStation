@@ -68,6 +68,48 @@ export default class VideoFileDB implements IVideoFileDB {
     }
 
     /**
+     * ビデオファイル情報を一括挿入する。
+     * 分割出力は一部だけが DB に登録されないよう、全件を同一トランザクションにする。
+     */
+    public async insertMany(videoFiles: VideoFile[]): Promise<apid.VideoFileId[]> {
+        if (videoFiles.length === 0) {
+            return [];
+        }
+
+        return this.promieRetry.run(async () => {
+            const connection = await this.op.getConnection();
+            const queryRunner = connection.createQueryRunner();
+            const videoFileIds: apid.VideoFileId[] = [];
+
+            try {
+                await queryRunner.connect();
+                await queryRunner.startTransaction();
+
+                for (const videoFile of videoFiles) {
+                    const insertEntity = Object.assign(new VideoFile(), videoFile);
+                    const insertedResult = await queryRunner.manager.insert(VideoFile, insertEntity);
+                    const videoFileId = insertedResult.identifiers[0]?.id;
+                    if (typeof videoFileId === 'undefined') {
+                        throw new Error('VideoFileIdIsNotReturned');
+                    }
+
+                    videoFileIds.push(videoFileId);
+                }
+
+                await queryRunner.commitTransaction();
+                return videoFileIds;
+            } catch (err: any) {
+                if (queryRunner.isTransactionActive === true) {
+                    await queryRunner.rollbackTransaction();
+                }
+                throw err;
+            } finally {
+                await queryRunner.release();
+            }
+        });
+    }
+
+    /**
      * ファイルパス変更
      * @param option: UpdateFilePathOption
      * @return Promise<void>
